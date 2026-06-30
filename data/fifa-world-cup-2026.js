@@ -3,7 +3,7 @@ window.TOURNAMENT_DATA = {
   "id": "fifa-world-cup-2026",
   "name": "FIFA World Cup 2026",
   "source": "https://fixturedownload.com/feed/json/fifa-world-cup-2026",
-  "fetchedAt": "2026-06-30T03:06:15.380Z",
+  "fetchedAt": "2026-06-30T10:13:18.667Z",
   "matches": [
     {
       "id": 1,
@@ -893,7 +893,7 @@ window.TOURNAMENT_DATA = {
       "kickoffUtc": "2026-07-04T17:00:00Z",
       "venue": "Houston Stadium",
       "home": "Canada",
-      "away": null
+      "away": "Morocco"
     },
     {
       "id": 89,
