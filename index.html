@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FIFA World Cup 2026 — Schedule</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="title-block">
+      <h1 id="tournament-name">World Cup Schedule</h1>
+      <p id="tournament-meta" class="muted"></p>
+    </div>
+
+    <div class="controls">
+      <div class="control view-toggle" role="group" aria-label="View">
+        <button type="button" class="seg" data-view="list" aria-pressed="true">List</button>
+        <button type="button" class="seg" data-view="calendar" aria-pressed="false">Calendar</button>
+      </div>
+
+      <button type="button" id="theme-toggle" class="icon-btn" aria-pressed="false" title="Toggle light/dark theme">
+        <span class="theme-icon" aria-hidden="true"></span>
+        <span class="theme-label">Dark</span>
+      </button>
+
+      <label class="control">
+        <span class="control-label">Timezone</span>
+        <select id="timezone-select"></select>
+      </label>
+
+      <div class="control inline-toggles">
+        <label class="switch" id="upcoming-only-control" title="Hide matches that have already kicked off (list and calendar)">
+          <input type="checkbox" id="upcoming-only-toggle" />
+          <span class="switch-text">Upcoming only</span>
+        </label>
+
+        <label class="switch" title="Show time as 12h or 24h">
+          <input type="checkbox" id="hour-format-toggle" />
+          <span class="switch-text">24-hour</span>
+        </label>
+
+        <label class="switch" title="Show 00:00–04:00 matches on the previous day as 24:00–28:00">
+          <input type="checkbox" id="extended-day-toggle" />
+          <span class="switch-text">Late-night on prev. day</span>
+        </label>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="list-view" class="view" aria-label="List view"></section>
+    <section id="calendar-view" class="view" hidden aria-label="Calendar view"></section>
+    <p id="empty-state" class="muted empty" hidden>No matches to display.</p>
+  </main>
+
+  <!-- Data first (sets window.TOURNAMENT_DATA), then app logic. Classic scripts
+       so the page works when opened directly from the file system. -->
+  <script src="data/fifa-world-cup-2026.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
