@@ -3,7 +3,7 @@ window.TOURNAMENT_DATA = {
   "id": "fifa-world-cup-2026",
   "name": "FIFA World Cup 2026",
   "source": "https://fixturedownload.com/feed/json/fifa-world-cup-2026",
-  "fetchedAt": "2026-06-30T10:13:18.667Z",
+  "fetchedAt": "2026-07-01T02:26:32.220Z",
   "matches": [
     {
       "id": 1,
@@ -903,7 +903,7 @@ window.TOURNAMENT_DATA = {
       "kickoffUtc": "2026-07-04T21:00:00Z",
       "venue": "Philadelphia Stadium",
       "home": "Paraguay",
-      "away": null
+      "away": "France"
     },
     {
       "id": 91,
@@ -913,7 +913,7 @@ window.TOURNAMENT_DATA = {
       "kickoffUtc": "2026-07-05T20:00:00Z",
       "venue": "New York/New Jersey Stadium",
       "home": "Brazil",
-      "away": null
+      "away": "Norway"
     },
     {
       "id": 92,
