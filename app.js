@@ -31,9 +31,16 @@
   var prefersLight =
     window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
 
+  function defaultView() {
+    if (window.matchMedia && window.matchMedia('(max-width: 640px)').matches) {
+      return 'list';
+    }
+    return 'calendar';
+  }
+
   function loadSettings() {
     var defaults = {
-      view: 'list',
+      view: defaultView(),
       timezone: browserTz,
       hour24: true,
       extendedDay: false,
