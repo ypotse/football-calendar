@@ -32,7 +32,9 @@ jobs:
           node-version: "20"
 
       - name: Refresh schedule data
-        run: node scripts/fetch-schedule.mjs
+        run: |
+          node scripts/fetch-schedule.mjs
+          node scripts/fetch-schedule.mjs --slug epl-2026 --name "English Premier League 2026-27" --kind league
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

@@ -1,11 +1,16 @@
-# Football Calendar — FIFA World Cup 2026 Schedule
+# Football Calendar
 
-A dependency-free, static HTML page that displays the **2026 FIFA World Cup** match
-schedule. It runs entirely in the browser — no build step and no server required —
-and the data layer is designed to be reused for other tournaments or leagues.
+A dependency-free, static HTML page that displays football schedules — currently
+the **English Premier League 2026-27** and the archived **2026 FIFA World Cup**.
+It runs entirely in the browser — no build step and no server required — and the
+data layer supports adding more leagues or tournaments.
 
 ## Features
 
+- **League picker** — switch between available leagues/tournaments; the choice
+  is remembered.
+- **Team filter** (Premier League) — show only matches involving selected teams.
+  Defaults to all teams; the selection is persisted in a **cookie** per league.
 - **List view** grouped by day, and a **month calendar view**.
 - **Timezone selector** — defaults to your browser timezone; all kickoff times are
   converted live.
@@ -17,7 +22,13 @@ and the data layer is designed to be reused for other tournaments or leagues.
 - **Light / dark theme** — follows your OS preference, and remembers your choice.
 - **Responsive** — works on mobile; the calendar scrolls horizontally to stay legible.
 
-All preferences are persisted in `localStorage`.
+Display preferences (view, timezone, theme, selected league, …) are persisted in
+`localStorage`. The team selection is persisted in a cookie (`fc_teams_<league>`).
+
+> Note: browsers may not persist cookies when the page is opened from `file://`.
+> Everything still works there — the team selection just won't be remembered
+> between visits. Serve the folder over HTTP (or use the GitHub Pages deployment)
+> for full persistence.
 
 ## Running locally
 
@@ -28,46 +39,64 @@ open index.html        # macOS
 # or double-click index.html in your file browser
 ```
 
-> The schedule is embedded in `data/fifa-world-cup-2026.js` (a `window.TOURNAMENT_DATA`
-> global) specifically so the page works when opened directly from the file system.
+> Schedules are embedded as classic scripts in `data/<slug>.js` (registering into
+> `window.SCHEDULES`) specifically so the page works when opened directly from
+> the file system.
 
-## Refreshing the World Cup 2026 fixtures
+## Refreshing fixtures
 
-The schedule is fetched from [fixturedownload.com](https://fixturedownload.com) and
+Schedules are fetched from [fixturedownload.com](https://fixturedownload.com) and
 normalized into a reusable JSON schema. Requires **Node.js 18+** (for built-in `fetch`).
 
 ```sh
+# English Premier League 2026-27
+node scripts/fetch-schedule.mjs --slug epl-2026 --name "English Premier League 2026-27" --kind league
+
+# FIFA World Cup 2026 (default: --kind worldcup, which maps knockout rounds)
 node scripts/fetch-schedule.mjs
 ```
 
-This regenerates two files in `data/`:
+Each run generates two files in `data/`:
 
-- `fifa-world-cup-2026.json` — canonical, reusable data
-- `fifa-world-cup-2026.js` — the same data wrapped as `window.TOURNAMENT_DATA` for the page
+- `<slug>.json` — canonical, reusable data
+- `<slug>.js` — the same data registered as `window.SCHEDULES['<slug>']` for the page
 
-## Reusing for another tournament
+## Adding another league or tournament
 
-`fixturedownload.com` exposes many competitions. Pass a different slug and display name:
+1. Fetch its schedule (pass `--kind league` for a plain round-robin league):
 
-```sh
-node scripts/fetch-schedule.mjs --slug fifa-world-cup-2022 --name "FIFA World Cup 2022"
-```
+   ```sh
+   node scripts/fetch-schedule.mjs --slug epl-2027 --name "English Premier League 2027-28" --kind league
+   ```
 
-Then point the page at the generated data file by editing the `<script src="...">` tag
-in `index.html`.
+2. Register it in `data/index.js`:
+
+   ```js
+   window.LEAGUES = [
+     { id: 'epl-2027', name: 'English Premier League 2027-28', default: true, teamFilter: true },
+     { id: 'epl-2026', name: 'English Premier League 2026-27 (archived)', archived: true, teamFilter: true },
+     { id: 'fifa-world-cup-2026', name: 'FIFA World Cup 2026 (archived)', archived: true },
+   ];
+   ```
+
+3. Add a `<script src="data/<slug>.js"></script>` tag in `index.html`.
+
+Registry flags: `default` marks the league shown on first visit, `archived` is
+informational (older competitions kept for browsing), and `teamFilter` enables
+the team selection dropdown.
 
 The normalized schema for each match is:
 
 ```json
 {
   "id": 1,
-  "stage": "group",
+  "stage": "league",
   "round": "Matchday 1",
-  "group": "Group A",
-  "kickoffUtc": "2026-06-11T19:00:00Z",
-  "venue": "Mexico City Stadium",
-  "home": "Mexico",
-  "away": "South Africa"
+  "group": null,
+  "kickoffUtc": "2026-08-21T19:00:00Z",
+  "venue": "Emirates Stadium",
+  "home": "Arsenal",
+  "away": "Coventry"
 }
 ```
 
@@ -79,14 +108,17 @@ The normalized schema for each match is:
 
 ```
 football-calendar/
-├── index.html                 # page markup + controls
-├── styles.css                 # styling (light/dark themes, responsive)
-├── app.js                     # all view logic (no dependencies)
+├── index.html                      # page markup + controls
+├── styles.css                      # styling (light/dark themes, responsive)
+├── app.js                          # all view logic (no dependencies)
 ├── data/
-│   ├── fifa-world-cup-2026.json   # canonical schedule data
-│   └── fifa-world-cup-2026.js     # generated window.TOURNAMENT_DATA global
+│   ├── index.js                    # league registry (window.LEAGUES)
+│   ├── epl-2026.json               # canonical schedule data
+│   ├── epl-2026.js                 # window.SCHEDULES['epl-2026']
+│   ├── fifa-world-cup-2026.json    # canonical schedule data (archived)
+│   └── fifa-world-cup-2026.js      # window.SCHEDULES['fifa-world-cup-2026']
 └── scripts/
-    └── fetch-schedule.mjs     # fetch + normalize the schedule
+    └── fetch-schedule.mjs          # fetch + normalize a schedule
 ```
 
 ## Deployment

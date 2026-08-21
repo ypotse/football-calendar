@@ -3,17 +3,39 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FIFA World Cup 2026 — Schedule</title>
+  <title>Football Calendar</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="app-header">
     <div class="title-block">
-      <h1 id="tournament-name">World Cup Schedule</h1>
+      <h1 id="tournament-name">Football Calendar</h1>
       <p id="tournament-meta" class="muted"></p>
     </div>
 
     <div class="controls">
+      <label class="control">
+        <span class="control-label">League</span>
+        <select id="league-select"></select>
+      </label>
+
+      <div class="control" id="team-filter" hidden>
+        <span class="control-label">Teams</span>
+        <div class="dropdown" id="team-dropdown">
+          <button type="button" id="team-filter-button" class="dropdown-button" aria-haspopup="true" aria-expanded="false">
+            <span id="team-filter-summary">All teams</span>
+            <span class="dropdown-caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="dropdown-panel" id="team-filter-panel" hidden>
+            <div class="dropdown-actions">
+              <button type="button" id="team-filter-all">All</button>
+              <button type="button" id="team-filter-none">None</button>
+            </div>
+            <div class="dropdown-list" id="team-filter-list"></div>
+          </div>
+        </div>
+      </div>
+
       <div class="control view-toggle" role="group" aria-label="View">
         <button type="button" class="seg" data-view="list" aria-pressed="true">List</button>
         <button type="button" class="seg" data-view="calendar" aria-pressed="false">Calendar</button>
@@ -54,8 +76,11 @@
     <p id="empty-state" class="muted empty" hidden>No matches to display.</p>
   </main>
 
-  <!-- Data first (sets window.TOURNAMENT_DATA), then app logic. Classic scripts
-       so the page works when opened directly from the file system. -->
+  <!-- Data first (registry sets window.LEAGUES, each schedule file registers
+       into window.SCHEDULES), then app logic. Classic scripts so the page works
+       when opened directly from the file system. -->
+  <script src="data/index.js"></script>
+  <script src="data/epl-2026.js"></script>
   <script src="data/fifa-world-cup-2026.js"></script>
   <script src="app.js"></script>
 </body>

@@ -1,16 +1,29 @@
-/* World Cup schedule viewer — vanilla JS, no build step.
- * Reads window.TOURNAMENT_DATA (set by data/<slug>.js). */
+/* Football calendar — vanilla JS, no build step.
+ * Reads window.LEAGUES (data/index.js) + window.SCHEDULES[id] (data/<id>.js). */
 (function () {
   'use strict';
 
-  var data = window.TOURNAMENT_DATA;
+  var leagues = window.LEAGUES || [];
+  var schedules = window.SCHEDULES || {};
 
-  var STORAGE_KEY = 'wc-schedule-settings';
+  var STORAGE_KEY = 'football-calendar-settings';
+  var LEGACY_STORAGE_KEY = 'wc-schedule-settings';
+  var COOKIE_PREFIX = 'fc_teams_';
+  var COOKIE_MAX_AGE = 365 * 24 * 60 * 60; // ~1 year, in seconds
   var WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   var els = {
     name: document.getElementById('tournament-name'),
     meta: document.getElementById('tournament-meta'),
+    league: document.getElementById('league-select'),
+    teamFilter: document.getElementById('team-filter'),
+    teamDropdown: document.getElementById('team-dropdown'),
+    teamButton: document.getElementById('team-filter-button'),
+    teamSummary: document.getElementById('team-filter-summary'),
+    teamPanel: document.getElementById('team-filter-panel'),
+    teamList: document.getElementById('team-filter-list'),
+    teamAll: document.getElementById('team-filter-all'),
+    teamNone: document.getElementById('team-filter-none'),
     tz: document.getElementById('timezone-select'),
     hourToggle: document.getElementById('hour-format-toggle'),
     extToggle: document.getElementById('extended-day-toggle'),
@@ -46,13 +59,27 @@
       extendedDay: false,
       upcomingOnly: true,
       theme: prefersLight ? 'light' : 'dark',
+      league: null, // resolved against the registry below
     };
+    var saved = {};
     try {
-      var saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-      return Object.assign(defaults, saved);
+      saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
     } catch (e) {
-      return defaults;
+      /* fall through to legacy migration */
     }
+    // One-time migration from the original single-tournament key.
+    if (!localStorage.getItem(STORAGE_KEY)) {
+      try {
+        var legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+        if (legacy) {
+          saved = Object.assign(saved, JSON.parse(legacy));
+          localStorage.removeItem(LEGACY_STORAGE_KEY);
+        }
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    return Object.assign(defaults, saved);
   }
 
   function saveSettings() {
@@ -60,6 +87,121 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
     } catch (e) {
       /* ignore quota / privacy-mode errors */
+    }
+  }
+
+  // ---- Cookies (team selection) -------------------------------------------
+  // Note: cookies may not persist when the page is opened from file://;
+  // the app still works, the selection just won't be remembered there.
+  function setCookie(name, value) {
+    try {
+      document.cookie =
+        name +
+        '=' +
+        encodeURIComponent(value) +
+        '; max-age=' +
+        COOKIE_MAX_AGE +
+        '; path=/; samesite=lax';
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  function getCookie(name) {
+    try {
+      var prefix = name + '=';
+      var parts = document.cookie ? document.cookie.split('; ') : [];
+      for (var i = 0; i < parts.length; i += 1) {
+        if (parts[i].indexOf(prefix) === 0) {
+          return decodeURIComponent(parts[i].slice(prefix.length));
+        }
+      }
+    } catch (e) {
+      /* ignore */
+    }
+    return null;
+  }
+
+  function deleteCookie(name) {
+    try {
+      document.cookie = name + '=; max-age=0; path=/';
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  // ---- Active league ------------------------------------------------------
+  function defaultLeagueId() {
+    for (var i = 0; i < leagues.length; i += 1) {
+      if (leagues[i].default && schedules[leagues[i].id]) return leagues[i].id;
+    }
+    for (var j = 0; j < leagues.length; j += 1) {
+      if (schedules[leagues[j].id]) return leagues[j].id;
+    }
+    return null;
+  }
+
+  function leagueConfig(id) {
+    for (var i = 0; i < leagues.length; i += 1) {
+      if (leagues[i].id === id) return leagues[i];
+    }
+    return null;
+  }
+
+  var data = null;
+  var league = null;
+  var teams = []; // sorted unique team names for the active league
+  var selectedTeams = null; // null = all teams (the default)
+
+  function resolveLeague() {
+    if (!settings.league || !schedules[settings.league]) {
+      settings.league = defaultLeagueId();
+    }
+    league = settings.league ? leagueConfig(settings.league) : null;
+    data = settings.league ? schedules[settings.league] : null;
+    teams = teamsFor(data);
+    selectedTeams = loadTeamSelection();
+  }
+
+  function teamsFor(leagueData) {
+    if (!leagueData || !leagueData.matches) return [];
+    var seen = {};
+    leagueData.matches.forEach(function (m) {
+      if (m.home) seen[m.home] = true;
+      if (m.away) seen[m.away] = true;
+    });
+    return Object.keys(seen).sort();
+  }
+
+  function teamCookieName() {
+    return COOKIE_PREFIX + settings.league;
+  }
+
+  // Returns null (all teams) when there is no cookie or the cookie holds no
+  // valid team names; otherwise the saved subset.
+  function loadTeamSelection() {
+    var raw = getCookie(teamCookieName());
+    if (!raw) return null;
+    try {
+      var saved = JSON.parse(raw);
+      if (!Array.isArray(saved)) return null;
+      var valid = saved.filter(function (t) {
+        return teams.indexOf(t) !== -1;
+      });
+      return valid.length ? valid : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Persist only real subsets; "all teams" is the default, so the cookie is
+  // removed in that case.
+  function saveTeamSelection() {
+    if (!selectedTeams || selectedTeams.length === teams.length) {
+      selectedTeams = null;
+      deleteCookie(teamCookieName());
+    } else {
+      setCookie(teamCookieName(), JSON.stringify(selectedTeams));
     }
   }
 
@@ -169,12 +311,24 @@
   }
 
   // ---- Data shaping --------------------------------------------------------
-  // Matches to display, honouring the "upcoming only" filter (hides matches
-  // that have already kicked off). Applies to both list and calendar views.
+  // Matches to display: team filter first (leagues that enable it), then the
+  // "upcoming only" filter (hides matches that have already kicked off).
+  // Applies to both list and calendar views.
   function visibleMatches() {
-    if (!settings.upcomingOnly) return data.matches;
+    if (!data || !data.matches) return [];
+    var matches = data.matches;
+    if (selectedTeams) {
+      var selected = {};
+      selectedTeams.forEach(function (t) {
+        selected[t] = true;
+      });
+      matches = matches.filter(function (m) {
+        return (m.home && selected[m.home]) || (m.away && selected[m.away]);
+      });
+    }
+    if (!settings.upcomingOnly) return matches;
     var now = Date.now();
-    return data.matches.filter(function (m) {
+    return matches.filter(function (m) {
       return new Date(m.kickoffUtc).getTime() >= now;
     });
   }
@@ -385,6 +539,7 @@
   // ---- Render dispatch -----------------------------------------------------
   function render() {
     var hasMatches = data && data.matches && data.matches.length > 0;
+    updateHeader();
 
     var isList = settings.view === 'list';
     els.listView.hidden = !isList;
@@ -479,10 +634,139 @@
     if (label) label.textContent = light ? 'Light' : 'Dark';
   }
 
+  // ---- League picker ------------------------------------------------------
+  function populateLeagues() {
+    var frag = document.createDocumentFragment();
+    leagues.forEach(function (l) {
+      if (!schedules[l.id]) return;
+      var opt = document.createElement('option');
+      opt.value = l.id;
+      opt.textContent = l.name;
+      frag.appendChild(opt);
+    });
+    els.league.appendChild(frag);
+    els.league.value = settings.league;
+  }
+
+  function updateHeader() {
+    els.name.textContent = league ? league.name : (data && data.name) || 'Schedule';
+    var count = visibleMatches().length;
+    var total = (data && data.matches && data.matches.length) || 0;
+    var text =
+      count + (count === 1 ? ' match' : ' matches');
+    if (selectedTeams) text += ' (of ' + total + ', filtered by team)';
+    text += ' · times shown in your selected timezone';
+    els.meta.textContent = text;
+  }
+
+  // ---- Team filter --------------------------------------------------------
+  function teamFilterEnabled() {
+    return !!(league && league.teamFilter && teams.length);
+  }
+
+  function isTeamSelected(team) {
+    return !selectedTeams || selectedTeams.indexOf(team) !== -1;
+  }
+
+  function renderTeamList() {
+    els.teamList.innerHTML = '';
+    var frag = document.createDocumentFragment();
+    teams.forEach(function (team) {
+      var label = document.createElement('label');
+      label.className = 'team-option';
+      var box = document.createElement('input');
+      box.type = 'checkbox';
+      box.value = team;
+      box.checked = isTeamSelected(team);
+      label.appendChild(box);
+      label.appendChild(document.createTextNode(team));
+      frag.appendChild(label);
+    });
+    els.teamList.appendChild(frag);
+  }
+
+  function updateTeamSummary() {
+    if (!selectedTeams || selectedTeams.length === teams.length) {
+      els.teamSummary.textContent = 'All teams';
+    } else if (selectedTeams.length === 0) {
+      els.teamSummary.textContent = 'No teams';
+    } else if (selectedTeams.length <= 2) {
+      els.teamSummary.textContent = selectedTeams.join(', ');
+    } else {
+      els.teamSummary.textContent = selectedTeams.length + ' teams';
+    }
+  }
+
+  function setupTeamFilter() {
+    var enabled = teamFilterEnabled();
+    els.teamFilter.hidden = !enabled;
+    closeTeamPanel();
+    if (!enabled) return;
+    renderTeamList();
+    updateTeamSummary();
+  }
+
+  function toggleTeamPanel(open) {
+    var show = typeof open === 'boolean' ? open : els.teamPanel.hidden;
+    els.teamPanel.hidden = !show;
+    els.teamButton.setAttribute('aria-expanded', show ? 'true' : 'false');
+  }
+
+  function closeTeamPanel() {
+    toggleTeamPanel(false);
+  }
+
+  function applyTeamSelection(list) {
+    selectedTeams = list;
+    saveTeamSelection();
+    renderTeamList();
+    updateTeamSummary();
+    updateHeader();
+    render();
+  }
+
+  function wireTeamFilter() {
+    els.teamButton.addEventListener('click', function () {
+      toggleTeamPanel();
+    });
+
+    els.teamList.addEventListener('change', function (e) {
+      if (e.target.type !== 'checkbox') return;
+      var current = selectedTeams ? selectedTeams.slice() : teams.slice();
+      if (e.target.checked) {
+        if (current.indexOf(e.target.value) === -1) current.push(e.target.value);
+      } else {
+        current = current.filter(function (t) {
+          return t !== e.target.value;
+        });
+      }
+      applyTeamSelection(current);
+    });
+
+    els.teamAll.addEventListener('click', function () {
+      applyTeamSelection(teams.slice());
+    });
+
+    els.teamNone.addEventListener('click', function () {
+      applyTeamSelection([]);
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!els.teamPanel.hidden && !els.teamDropdown.contains(e.target)) {
+        closeTeamPanel();
+      }
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeTeamPanel();
+    });
+  }
+
   function syncControls() {
     els.hourToggle.checked = settings.hour24;
     els.extToggle.checked = settings.extendedDay;
     els.upcomingToggle.checked = settings.upcomingOnly;
+    if (settings.league) els.league.value = settings.league;
     applyTheme();
     els.viewButtons.forEach(function (btn) {
       var pressed = btn.getAttribute('data-view') === settings.view;
@@ -491,6 +775,16 @@
   }
 
   function wireEvents() {
+    els.league.addEventListener('change', function () {
+      settings.league = els.league.value;
+      saveSettings();
+      resolveLeague();
+      setupTeamFilter();
+      updateHeader();
+      render();
+      if (settings.view === 'calendar') focusCurrentMonth();
+    });
+
     els.tz.addEventListener('change', function () {
       settings.timezone = els.tz.value;
       saveSettings();
@@ -512,6 +806,7 @@
     els.upcomingToggle.addEventListener('change', function () {
       settings.upcomingOnly = els.upcomingToggle.checked;
       saveSettings();
+      updateHeader();
       render();
     });
 
@@ -534,20 +829,21 @@
 
   // ---- Init ----------------------------------------------------------------
   function init() {
+    resolveLeague();
+
     if (!data) {
       els.name.textContent = 'No data loaded';
       els.meta.textContent = 'Run: node scripts/fetch-schedule.mjs';
       return;
     }
 
-    els.name.textContent = data.name || 'Schedule';
-    var count = (data.matches && data.matches.length) || 0;
-    els.meta.textContent =
-      count + ' matches · times shown in your selected timezone';
-
+    populateLeagues();
     populateTimezones();
-    syncControls();
     wireEvents();
+    wireTeamFilter();
+    setupTeamFilter();
+    syncControls();
+    updateHeader();
     render();
     if (settings.view === 'calendar') focusCurrentMonth();
   }
